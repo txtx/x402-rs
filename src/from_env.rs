@@ -1,4 +1,6 @@
+use crate::network::EvmNetwork;
 use crate::network::Network;
+use crate::network::SolanaNetwork;
 use alloy::network::EthereumWallet;
 use alloy::signers::local::PrivateKeySigner;
 use serde::Deserialize;
@@ -22,20 +24,26 @@ pub const ENV_RPC_POLYGON_AMOY: &str = "RPC_URL_POLYGON_AMOY";
 pub const ENV_RPC_POLYGON: &str = "RPC_URL_POLYGON";
 pub const ENV_RPC_SEI: &str = "RPC_URL_SEI";
 pub const ENV_RPC_SEI_TESTNET: &str = "RPC_URL_SEI_TESTNET";
+pub const ENV_RPC_LOCAL_EVM: &str = "RPC_URL_LOCAL_EVM";
+pub const ENV_RPC_LOCAL_SURFNET: &str = "RPC_URL_LOCAL_SURFNET";
+pub const ENV_RPC_CLOUD_SURFNET: &str = "RPC_URL_CLOUD_SURFNET";
 
 pub fn rpc_env_name_from_network(network: Network) -> &'static str {
     match network {
-        Network::BaseSepolia => ENV_RPC_BASE_SEPOLIA,
-        Network::Base => ENV_RPC_BASE,
-        Network::XdcMainnet => ENV_RPC_XDC,
-        Network::AvalancheFuji => ENV_RPC_AVALANCHE_FUJI,
-        Network::Avalanche => ENV_RPC_AVALANCHE,
-        Network::Solana => ENV_RPC_SOLANA,
-        Network::SolanaDevnet => ENV_RPC_SOLANA_DEVNET,
-        Network::PolygonAmoy => ENV_RPC_POLYGON_AMOY,
-        Network::Polygon => ENV_RPC_POLYGON,
-        Network::Sei => ENV_RPC_SEI,
-        Network::SeiTestnet => ENV_RPC_SEI_TESTNET,
+        Network::Evm(EvmNetwork::AvalancheFuji) => ENV_RPC_AVALANCHE_FUJI,
+        Network::Evm(EvmNetwork::Avalanche) => ENV_RPC_AVALANCHE,
+        Network::Evm(EvmNetwork::PolygonAmoy) => ENV_RPC_POLYGON_AMOY,
+        Network::Evm(EvmNetwork::Polygon) => ENV_RPC_POLYGON,
+        Network::Evm(EvmNetwork::Sei) => ENV_RPC_SEI,
+        Network::Evm(EvmNetwork::SeiTestnet) => ENV_RPC_SEI_TESTNET,
+        Network::Evm(EvmNetwork::Base) => ENV_RPC_BASE,
+        Network::Evm(EvmNetwork::BaseSepolia) => ENV_RPC_BASE_SEPOLIA,
+        Network::Evm(EvmNetwork::XdcMainnet) => ENV_RPC_XDC,
+        Network::Evm(EvmNetwork::Local) => ENV_RPC_LOCAL_EVM,
+        Network::Solana(SolanaNetwork::Mainnet) => ENV_RPC_SOLANA,
+        Network::Solana(SolanaNetwork::Devnet) => ENV_RPC_SOLANA_DEVNET,
+        Network::Solana(SolanaNetwork::LocalSurfnet) => ENV_RPC_LOCAL_SURFNET,
+        Network::Solana(SolanaNetwork::CloudSurfnet) => ENV_RPC_CLOUD_SURFNET,
     }
 }
 

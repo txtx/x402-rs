@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTimeError;
 use tracing::instrument;
-use x402_rs::network::{Network, USDCDeployment};
+use x402_rs::network::{EvmNetwork, Network, USDCDeployment};
 use x402_rs::types::{
     Base64Bytes, MixedAddressError, MoneyAmount, MoneyAmountParseError, PaymentPayload,
     PaymentRequiredResponse, PaymentRequirements, TokenAmount, TokenAsset, TokenDeployment,
@@ -191,7 +191,11 @@ impl X402Payments {
                 .iter()
                 .position(|a| a == &req.token_asset())
                 .unwrap_or(usize::MAX);
-            let base_priority = if req.network == Network::Base { 0 } else { 1 };
+            let base_priority = if req.network == Network::Evm(EvmNetwork::Base) {
+                0
+            } else {
+                1
+            };
             (pref_index, base_priority)
         });
 

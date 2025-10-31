@@ -1,7 +1,7 @@
 use crate::chain::{FacilitatorLocalError, FromEnvByNetworkBuild, NetworkProviderOps};
 use crate::facilitator::Facilitator;
 use crate::from_env;
-use crate::network::Network;
+use crate::network::{Network, SolanaNetwork};
 use crate::types::{
     Base64Bytes, ExactPaymentPayload, FacilitatorErrorReason, MixedAddress, PaymentRequirements,
     SettleRequest, SettleResponse, SupportedPaymentKind, SupportedPaymentKindExtra,
@@ -11,10 +11,10 @@ use crate::types::{Scheme, X402Version};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_config::{RpcSendTransactionConfig, RpcSimulateTransactionConfig};
 use solana_commitment_config::CommitmentConfig;
-use solana_sdk::instruction::CompiledInstruction;
-use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signature::{Keypair, Signature};
-use solana_sdk::signer::Signer;
+use solana_keypair::{Keypair, Signer};
+use solana_message::compiled_instruction::CompiledInstruction;
+use solana_pubkey::Pubkey;
+use solana_sdk::signature::Signature;
 use solana_sdk::transaction::VersionedTransaction;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
@@ -24,7 +24,7 @@ use tracing_core::Level;
 
 #[derive(Clone, Debug)]
 pub struct SolanaChain {
-    pub network: Network,
+    pub network: SolanaNetwork,
 }
 
 impl TryFrom<Network> for SolanaChain {
@@ -32,17 +32,8 @@ impl TryFrom<Network> for SolanaChain {
 
     fn try_from(value: Network) -> Result<Self, Self::Error> {
         match value {
-            Network::Solana => Ok(Self { network: value }),
-            Network::SolanaDevnet => Ok(Self { network: value }),
-            Network::BaseSepolia => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::Base => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::XdcMainnet => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::AvalancheFuji => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::Avalanche => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::PolygonAmoy => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::Polygon => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::Sei => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::SeiTestnet => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
+            Network::Solana(network) => Ok(SolanaChain { network }),
+            _ => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
         }
     }
 }
@@ -104,6 +95,15 @@ impl Debug for SolanaProvider {
 }
 
 impl SolanaProvider {
+    pub fn solana_network(&self) -> SolanaNetwork {
+        self.chain.network
+    }
+    pub fn rpc_url(&self) -> String {
+        self.rpc_client.url()
+    }
+    pub fn facilitator_pubkey(&self) -> Pubkey {
+        self.keypair.pubkey()
+    }
     pub fn try_new(
         keypair: Keypair,
         rpc_url: String,
@@ -135,7 +135,7 @@ impl SolanaProvider {
                     "invalid_exact_svm_payload_transaction_instructions_length".to_string(),
                 ))?;
         let account = instruction.program_id(transaction.message.static_account_keys());
-        let compute_budget = solana_sdk::compute_budget::ID;
+        let compute_budget = solana_sdk_ids::compute_budget::ID;
         if compute_budget.ne(account) || instruction.data.first().cloned().unwrap_or(0) != 2 {
             return Err(FacilitatorLocalError::DecodingError(
                 "invalid_exact_svm_payload_transaction_instructions_length".to_string(),
@@ -159,7 +159,7 @@ impl SolanaProvider {
                         .to_string(),
                 ))?;
         let account = instruction.program_id(transaction.message.static_account_keys());
-        let compute_budget = solana_sdk::compute_budget::ID;
+        let compute_budget = solana_sdk_ids::compute_budget::ID;
         let data = instruction.data.as_slice();
         if compute_budget.ne(account) || data.first().cloned().unwrap_or(0) != 3 || data.len() != 9
         {
@@ -233,7 +233,8 @@ impl SolanaProvider {
         let instruction = tx.instruction(instruction_index)?;
         instruction.assert_not_empty()?;
         let program_id = instruction.program_id();
-        let transfer_checked_instruction = if spl_token::ID.eq(&program_id) {
+        println!("Using token program_id: {}", program_id);
+        let transfer_checked_instruction = if spl_token_interface::ID.eq(&program_id) {
             let token_instruction =
                 spl_token::instruction::TokenInstruction::unpack(instruction.data_slice())
                     .map_err(|_| {
@@ -266,10 +267,10 @@ impl SolanaProvider {
                 mint,
                 destination,
                 authority,
-                token_program: spl_token::ID,
+                token_program: spl_token_interface::ID,
                 data: instruction.data(),
             }
-        } else if spl_token_2022::ID.eq(&program_id) {
+        } else if spl_token_2022_interface::ID.eq(&program_id) {
             let token_instruction =
                 spl_token_2022::instruction::TokenInstruction::unpack(instruction.data_slice())
                     .map_err(|_| {
@@ -296,6 +297,10 @@ impl SolanaProvider {
             let destination = instruction.account(2)?;
             // Authority = 3
             let authority = instruction.account(3)?;
+            println!(
+                "Transferring {} {} from {} to {}",
+                amount, mint, source, destination
+            );
             TransferCheckedInstruction {
                 amount,
                 decimals,
@@ -303,7 +308,7 @@ impl SolanaProvider {
                 mint,
                 destination,
                 authority,
-                token_program: spl_token_2022::ID,
+                token_program: spl_token_2022_interface::ID,
                 data: instruction.data(),
             }
         } else {
@@ -325,6 +330,8 @@ impl SolanaProvider {
             ],
             &program_id,
         );
+        println!("Using associated token address: {:?}", ata);
+        println!("Source: {:?}", transfer_checked_instruction.source);
         if transfer_checked_instruction.destination != ata {
             return Err(FacilitatorLocalError::DecodingError(
                 "invalid_exact_svm_payload_transaction_transfer_to_incorrect_ata".to_string(),
@@ -456,6 +463,10 @@ impl FromEnvByNetworkBuild for SolanaProvider {
                 return Ok(None);
             }
         };
+        println!(
+            "Initializing Solana provider for network {:?} with RPC URL: {}",
+            network, rpc_url
+        );
         let keypair = from_env::SignerType::from_env()?.make_solana_wallet()?;
         let provider = SolanaProvider::try_new(keypair, rpc_url, network)?;
         Ok(Some(provider))
@@ -485,7 +496,7 @@ impl NetworkProviderOps for SolanaProvider {
     }
 
     fn network(&self) -> Network {
-        self.chain.network
+        Network::Solana(self.chain.network)
     }
 }
 
@@ -525,6 +536,10 @@ impl Facilitator for SolanaProvider {
     }
 
     async fn supported(&self) -> Result<SupportedPaymentKindsResponse, Self::Error> {
+        println!(
+            "Getting supported payment kinds for Solana network: {:?}",
+            self.network()
+        );
         let kinds = vec![SupportedPaymentKind {
             network: self.network().to_string(),
             scheme: Scheme::Exact,

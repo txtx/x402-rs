@@ -6,7 +6,7 @@ use std::env;
 use x402_reqwest::chains::evm::EvmSenderWallet;
 use x402_reqwest::chains::solana::SolanaSenderWallet;
 use x402_reqwest::{MaxTokenAmountFromAmount, ReqwestWithPayments, ReqwestWithPaymentsBuild};
-use x402_rs::network::{Network, USDCDeployment};
+use x402_rs::network::{EvmNetwork, Network, SolanaNetwork, USDCDeployment};
 
 async fn buy_evm() -> Result<(), Box<dyn std::error::Error>> {
     let signer: PrivateKeySigner = env::var("EVM_PRIVATE_KEY")?.parse()?;
@@ -15,8 +15,10 @@ async fn buy_evm() -> Result<(), Box<dyn std::error::Error>> {
     // Vanilla reqwest
     let http_client = Client::new()
         .with_payments(sender)
-        .prefer(USDCDeployment::by_network(Network::BaseSepolia))
-        .max(USDCDeployment::by_network(Network::BaseSepolia).amount(0.1)?)
+        .prefer(USDCDeployment::by_network(Network::Evm(
+            EvmNetwork::BaseSepolia,
+        )))
+        .max(USDCDeployment::by_network(Network::Evm(EvmNetwork::BaseSepolia)).amount(0.1)?)
         .build();
 
     let response = http_client
@@ -40,8 +42,10 @@ async fn buy_solana() -> Result<(), Box<dyn std::error::Error>> {
     // Vanilla reqwest
     let http_client = Client::new()
         .with_payments(sender)
-        .prefer(USDCDeployment::by_network(Network::Solana))
-        .max(USDCDeployment::by_network(Network::Solana).amount(0.1)?)
+        .prefer(USDCDeployment::by_network(Network::Solana(
+            SolanaNetwork::LocalSurfnet,
+        )))
+        .max(USDCDeployment::by_network(Network::Solana(SolanaNetwork::LocalSurfnet)).amount(0.1)?)
         .build();
 
     let response = http_client
@@ -58,5 +62,5 @@ async fn buy_solana() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    buy_evm().await
+    buy_solana().await
 }

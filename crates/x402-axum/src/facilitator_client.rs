@@ -263,7 +263,11 @@ impl FacilitatorClient {
     }
 
     pub async fn supported(&self) -> Result<SupportedPaymentKindsResponse, FacilitatorClientError> {
-        self.get_json(&self.supported_url, "GET /supported").await
+        let resp: serde_json::Value = self.get_json(&self.supported_url, "GET /supported").await?;
+        println!("Supported response JSON: {}", resp);
+        let supported: SupportedPaymentKindsResponse = serde_json::from_value(resp).unwrap();
+        println!("Supported payment kinds: {:?}", supported);
+        Ok(supported)
     }
 
     /// Generic POST helper that handles JSON serialization, error mapping,

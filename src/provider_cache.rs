@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use crate::chain::FromEnvByNetworkBuild;
 use crate::chain::NetworkProvider;
 use crate::network::Network;
+use crate::network::NetworkTrait;
 
 /// A cache of pre-initialized [`EthereumProvider`] instances keyed by network.
 ///
@@ -31,6 +32,7 @@ use crate::network::Network;
 /// and wrapping them with appropriate signing and filler middleware.
 ///
 /// Use [`ProviderCache::from_env`] to load credentials and connect using environment variables.
+#[derive(Clone)]
 pub struct ProviderCache {
     providers: HashMap<Network, NetworkProvider>,
 }
@@ -76,6 +78,14 @@ impl ProviderCache {
             }
         }
         Ok(Self { providers })
+    }
+
+    pub fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (Network, NetworkProvider)>,
+    {
+        let providers = iter.into_iter().collect();
+        Self { providers }
     }
 }
 

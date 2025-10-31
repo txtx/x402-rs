@@ -9,9 +9,10 @@ use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use x402_axum::{IntoPriceTag, X402Middleware};
-use x402_rs::network::{Network, USDCDeployment};
+use x402_rs::network::{Network, SolanaNetwork, USDCDeployment};
 use x402_rs::telemetry::Telemetry;
-use x402_rs::{address_evm, address_sol};
+use x402_rs::types::MixedAddress;
+use x402_rs::types::pubkey::Pubkey;
 
 #[tokio::main]
 async fn main() {
@@ -25,13 +26,25 @@ async fn main() {
     let facilitator_url =
         env::var("FACILITATOR_URL").unwrap_or_else(|_| "https://facilitator.x402.rs".to_string());
 
+    let sol_facilitator_public_key = MixedAddress::Solana(Pubkey::from_str_const(
+        &env::var("SOL_FACILITATOR_PUBLIC_KEY")
+            .ok()
+            .unwrap_or("EGBQqKn968sVv5cQh5Cr72pSTHfxsuzq7o7asqYB5uEV".to_string()),
+    ));
+
+    println!(
+        "Using Solana facilitator public key: {}",
+        sol_facilitator_public_key
+    );
+
     let x402 = X402Middleware::try_from(facilitator_url)
         .unwrap()
         .with_base_url(url::Url::parse("https://localhost:3000/").unwrap());
-    let usdc_base_sepolia = USDCDeployment::by_network(Network::BaseSepolia)
-        .pay_to(address_evm!("0xBAc675C310721717Cd4A37F6cbeA1F081b1C2a07"));
-    let usdc_solana = USDCDeployment::by_network(Network::Solana)
-        .pay_to(address_sol!("EGBQqKn968sVv5cQh5Cr72pSTHfxsuzq7o7asqYB5uEV"));
+    let usdc_local_surfnet =
+        USDCDeployment::by_network(Network::Solana(SolanaNetwork::LocalSurfnet))
+            .pay_to(sol_facilitator_public_key.clone());
+    let usdc_solana = USDCDeployment::by_network(Network::Solana(SolanaNetwork::Mainnet))
+        .pay_to(sol_facilitator_public_key);
 
     let app = Router::new()
         .route(
@@ -40,7 +53,7 @@ async fn main() {
                 x402.with_description("Premium API")
                     .with_mime_type("application/json")
                     .with_price_tag(usdc_solana.amount(0.0025).unwrap())
-                    .or_price_tag(usdc_base_sepolia.amount(0.0025).unwrap()),
+                    .or_price_tag(usdc_local_surfnet.amount(0.0025).unwrap()),
             ),
         )
         .layer(

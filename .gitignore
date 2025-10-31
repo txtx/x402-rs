@@ -3,3 +3,7 @@
 .env
 crates/*/target/
 examples/*/.env
+.DS_Store
+.surfpool
+stdout
+stderr

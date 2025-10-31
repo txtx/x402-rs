@@ -94,7 +94,9 @@ impl SenderWallet for SolanaSenderWallet {
                 "failed to convert asset to SolanaAddress: {e}"
             ))
         })?;
+        println!("Preparing Solana payment payload for asset: {:?}", asset);
         let mint = self.fetch_mint(&asset)?;
+        println!("Fetched mint for asset: {:?}", mint);
         // create the ATA (if needed)
         let fee_payer = selected
             .extra
@@ -110,8 +112,10 @@ impl SenderWallet for SolanaSenderWallet {
         // findAssociatedTokenPda
         let program_id = Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
             .map_err(|e| X402PaymentsError::SigningError(format!("{e}")))?;
+        println!("Using token program_id: {}", program_id);
         let asset_address: SolanaAddress = asset.clone();
         let asset_address: Pubkey = asset_address.into();
+        println!("Using pay to address: {:?}", selected.pay_to);
         let pay_to_address: SolanaAddress = selected
             .pay_to
             .clone()
@@ -127,14 +131,17 @@ impl SenderWallet for SolanaSenderWallet {
             ],
             &program_id,
         );
+        println!("Pay to ata: {:?}", ata);
         let ata_account = self
             .rpc_client
             .get_account_with_commitment(&ata, self.rpc_client.commitment())
             .map_err(|e| X402PaymentsError::SigningError(format!("{e}")))?
             .value;
         let create_ata_instruction = if ata_account.is_some() {
+            println!("Associated token account already exists: {:?}", ata);
             None
         } else {
+            println!("Creating associated token account: {:?}", ata);
             // getCreateAssociatedTokenInstruction
             let funding_address = &fee_payer;
             let wallet_address = &pay_to_address;
@@ -151,6 +158,8 @@ impl SenderWallet for SolanaSenderWallet {
 
         // createTransferInstruction
         let client_address = self.keypair.pubkey();
+
+        println!("Source client address: {}", client_address);
         let (source_ata, _) = Pubkey::find_program_address(
             // findAssociatedTokenPda
             &[
@@ -160,6 +169,7 @@ impl SenderWallet for SolanaSenderWallet {
             ],
             &program_id,
         );
+        println!("Source associated token account: {:?}", source_ata);
         let destination_ata = ata;
         let amount: u64 = selected
             .max_amount_required

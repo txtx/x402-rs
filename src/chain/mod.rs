@@ -12,6 +12,7 @@ use crate::types::{
 pub mod evm;
 pub mod solana;
 
+#[derive(Clone)]
 pub enum NetworkProvider {
     Evm(EvmProvider),
     Solana(SolanaProvider),

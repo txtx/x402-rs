@@ -29,6 +29,8 @@ use url::Url;
 use crate::network::Network;
 use crate::timestamp::UnixTimestamp;
 
+pub use solana_sdk::pubkey;
+
 /// Represents the protocol version. Currently only version 1 is supported.
 #[derive(Debug, Copy, Clone)]
 pub enum X402Version {

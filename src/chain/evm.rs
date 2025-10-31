@@ -29,7 +29,7 @@ use alloy::providers::fillers::{
 use alloy::providers::{
     Identity, MULTICALL3_ADDRESS, MulticallItem, Provider, RootProvider, WalletProvider,
 };
-use alloy::rpc::client::RpcClient;
+use alloy::rpc::client::{ClientBuilder, RpcClient};
 use alloy::rpc::types::{TransactionReceipt, TransactionRequest};
 use alloy::sol_types::{Eip712Domain, SolCall, SolStruct, eip712_domain};
 use alloy::{hex, sol};
@@ -44,7 +44,7 @@ use tracing_core::Level;
 use crate::chain::{FacilitatorLocalError, FromEnvByNetworkBuild, NetworkProviderOps};
 use crate::facilitator::Facilitator;
 use crate::from_env;
-use crate::network::{Network, USDCDeployment};
+use crate::network::{EvmNetwork, Network, USDCDeployment};
 use crate::timestamp::UnixTimestamp;
 use crate::types::{
     EvmAddress, EvmSignature, ExactPaymentPayload, FacilitatorErrorReason, HexEncodedNonce,
@@ -123,17 +123,16 @@ impl TryFrom<Network> for EvmChain {
     /// Returns [`FacilitatorLocalError::UnsupportedNetwork`] for non-EVM networks (e.g. Solana).
     fn try_from(value: Network) -> Result<Self, Self::Error> {
         match value {
-            Network::BaseSepolia => Ok(EvmChain::new(value, 84532)),
-            Network::Base => Ok(EvmChain::new(value, 8453)),
-            Network::XdcMainnet => Ok(EvmChain::new(value, 50)),
-            Network::AvalancheFuji => Ok(EvmChain::new(value, 43113)),
-            Network::Avalanche => Ok(EvmChain::new(value, 43114)),
-            Network::Solana => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::SolanaDevnet => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
-            Network::PolygonAmoy => Ok(EvmChain::new(value, 80002)),
-            Network::Polygon => Ok(EvmChain::new(value, 137)),
-            Network::Sei => Ok(EvmChain::new(value, 1329)),
-            Network::SeiTestnet => Ok(EvmChain::new(value, 1328)),
+            Network::Evm(EvmNetwork::BaseSepolia) => Ok(EvmChain::new(value, 84532)),
+            Network::Evm(EvmNetwork::Base) => Ok(EvmChain::new(value, 8453)),
+            Network::Evm(EvmNetwork::XdcMainnet) => Ok(EvmChain::new(value, 50)),
+            Network::Evm(EvmNetwork::AvalancheFuji) => Ok(EvmChain::new(value, 43113)),
+            Network::Evm(EvmNetwork::Avalanche) => Ok(EvmChain::new(value, 43114)),
+            Network::Evm(EvmNetwork::PolygonAmoy) => Ok(EvmChain::new(value, 80002)),
+            Network::Evm(EvmNetwork::Polygon) => Ok(EvmChain::new(value, 137)),
+            Network::Evm(EvmNetwork::Sei) => Ok(EvmChain::new(value, 1329)),
+            Network::Evm(EvmNetwork::SeiTestnet) => Ok(EvmChain::new(value, 1328)),
+            _ => Err(FacilitatorLocalError::UnsupportedNetwork(None)),
         }
     }
 }
@@ -163,7 +162,7 @@ pub struct ExactEvmPayment {
 ///
 /// Holds a composed Alloy ethereum provider [`InnerProvider`],
 /// an `eip1559` toggle for gas pricing strategy, and the `EvmChain` context.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EvmProvider {
     /// Composed Alloy provider with all fillers.
     inner: InnerProvider,
@@ -347,21 +346,39 @@ impl FromEnvByNetworkBuild for EvmProvider {
         };
         let wallet = from_env::SignerType::from_env()?.make_evm_wallet()?;
         let is_eip1559 = match network {
-            Network::BaseSepolia => true,
-            Network::Base => true,
-            Network::XdcMainnet => false,
-            Network::AvalancheFuji => true,
-            Network::Avalanche => true,
-            Network::Solana => false,
-            Network::SolanaDevnet => false,
-            Network::PolygonAmoy => true,
-            Network::Polygon => true,
-            Network::Sei => true,
-            Network::SeiTestnet => true,
+            Network::Evm(EvmNetwork::BaseSepolia) => true,
+            Network::Evm(EvmNetwork::Base) => true,
+            Network::Evm(EvmNetwork::XdcMainnet) => false,
+            Network::Evm(EvmNetwork::AvalancheFuji) => true,
+            Network::Evm(EvmNetwork::Avalanche) => true,
+            Network::Evm(EvmNetwork::PolygonAmoy) => true,
+            Network::Evm(EvmNetwork::Polygon) => true,
+            Network::Evm(EvmNetwork::Sei) => true,
+            Network::Evm(EvmNetwork::SeiTestnet) => true,
+            Network::Solana(_) => false,
+            Network::Evm(EvmNetwork::Local) => check_is_eip_1559(&rpc_url).await?,
         };
         let provider = EvmProvider::try_new(wallet, &rpc_url, is_eip1559, network).await?;
         Ok(Some(provider))
     }
+}
+
+async fn check_is_eip_1559(rpc_url: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let client = ClientBuilder::default()
+        .connect(rpc_url)
+        .await
+        .map_err(|e| format!("Failed to connect to RPC at {rpc_url}: {e}"))?;
+    let provider = ProviderBuilder::new().connect_client(client);
+    let fee = provider
+        .get_fee_history(1, alloy::eips::BlockNumberOrTag::Latest, &[])
+        .await?;
+    // if baseFeePerGas is 0, then the network does not support EIP-1559
+    let is_eip1559 = fee
+        .base_fee_per_gas
+        .get(0)
+        .map(|fee| *fee > 0)
+        .unwrap_or(false);
+    Ok(is_eip1559)
 }
 
 impl<P> Facilitator for P

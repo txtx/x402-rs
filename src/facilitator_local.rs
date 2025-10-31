@@ -23,6 +23,7 @@ use crate::types::{
 ///
 /// This type is generic over the [`ProviderMap`] implementation used to access EVM providers,
 /// which enables testing or customization beyond the default [`ProviderCache`].
+#[derive(Clone)]
 pub struct FacilitatorLocal<A> {
     provider_map: A,
 }

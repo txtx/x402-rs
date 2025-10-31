@@ -235,6 +235,7 @@ where
                 .price_tag
                 .iter()
                 .map(|price_tag| {
+                    println!("Using price tag: {:?}", price_tag);
                     let extra = if let Some(eip712) = price_tag.token.eip712.clone() {
                         Some(json!({
                             "name": eip712.name,
@@ -264,6 +265,7 @@ where
                 .price_tag
                 .iter()
                 .map(|price_tag| {
+                    println!("Using price tag (no resource): {:?}", price_tag);
                     let extra = if let Some(eip712) = price_tag.token.eip712.clone() {
                         Some(json!({
                             "name": eip712.name,
@@ -465,6 +467,7 @@ where
         &self,
         headers: &HeaderMap,
     ) -> Result<PaymentPayload, X402Error> {
+        println!("Extracting X-Payment header from request");
         let payment_header = headers.get("X-Payment");
         let supported = self.facilitator.supported().await.map_err(|e| {
             X402Error(PaymentRequiredResponse {
@@ -482,6 +485,7 @@ where
                     .map(|r| {
                         let mut r = r.clone();
                         let network = r.network;
+                        println!("Preparing payment requirement for network: {}", network);
                         let extra = supported
                             .kinds
                             .iter()
