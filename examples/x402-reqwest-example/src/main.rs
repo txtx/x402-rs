@@ -1,7 +1,7 @@
 use alloy::signers::local::PrivateKeySigner;
 use dotenvy::dotenv;
 use reqwest::Client;
-use solana_sdk::signature::Keypair;
+use solana_keypair::Keypair;
 use std::env;
 use x402_reqwest::chains::evm::EvmSenderWallet;
 use x402_reqwest::chains::solana::SolanaSenderWallet;

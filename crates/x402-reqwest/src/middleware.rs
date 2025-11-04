@@ -311,6 +311,8 @@ impl rqm::Middleware for X402Payments {
 
         let payment_required_response = res.json::<PaymentRequiredResponse>().await?;
 
+        println!("Payment required: {:?}", payment_required_response);
+
         let retry_req = async {
             let payment_header = self
                 .build_payment_header(&payment_required_response.accepts)

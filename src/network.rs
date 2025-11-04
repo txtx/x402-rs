@@ -125,7 +125,7 @@ pub enum SolanaNetwork {
     Devnet,
     #[serde(rename = "cloud-surfnet")]
     CloudSurfnet,
-    #[serde(rename = "local-surfnet")]
+    #[serde(rename = "solana-surfnet")]
     LocalSurfnet,
 }
 
@@ -146,7 +146,7 @@ impl Display for SolanaNetwork {
             SolanaNetwork::Mainnet => "solana",
             SolanaNetwork::Devnet => "solana-devnet",
             SolanaNetwork::CloudSurfnet => "cloud-surfnet",
-            SolanaNetwork::LocalSurfnet => "local-surfnet",
+            SolanaNetwork::LocalSurfnet => "solana-surfnet",
         };
         write!(f, "{name}")
     }

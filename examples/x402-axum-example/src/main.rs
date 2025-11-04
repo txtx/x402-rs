@@ -52,7 +52,7 @@ async fn main() {
             get(my_handler).layer(
                 x402.with_description("Premium API")
                     .with_mime_type("application/json")
-                    .with_price_tag(usdc_solana.amount(0.0025).unwrap())
+                    // .with_price_tag(usdc_solana.amount(0.0025).unwrap())
                     .or_price_tag(usdc_local_surfnet.amount(0.0025).unwrap()),
             ),
         )
